@@ -81,3 +81,100 @@ def metropolis(chain, T, etol=0.0001, steps_per_cycle=100):
         avg_en = (avg_en_prev * Ncycles + avg_en) / (Ncycles + 1) # added with the previous energy and divided into
         Ncycles += 1                                              # the number of iterations to get the average
     return energies
+    
+
+------- Adding an external magnetic field ------- 
+
+def M(chain):
+    n = len(chain)
+    m = len(chain[0])
+    M = 0
+    for i in range(n):
+        for j in range(m):
+            M = M + chain[i][j]
+    return M
+    
+def make_chain(n, m):
+    return [[-1 if random.randint(0, 1) else 1 for _ in range(m)] for _ in range(n)]
+
+def magfield(i, j, H, chain):
+     return -(H * chain[i][j])
+
+def energy(i, j, chain):
+    n = len(chain)
+    m = len(chain[0])
+    return -(chain[i-1][j] * chain[i][j] + chain[i][j] * chain[(i+1)%n][j] +
+            chain[i][j-1] * chain[i][j] + chain[i][j] * chain[i][(j+1)%m])
+
+def try_energy(i, j, H, chain):
+    E = energy(i, j, chain) + magfield(i, j, H, chain)
+    return E * (-2)
+
+def calc_tot_en(chain, H):
+    n = len(chain)
+    m = len(chain[0])
+    tot_en = 0.0
+    for i in range(n):
+        for j in range(m):
+            tot_en = tot_en + energy(i, j, chain)/4 + magfield(i, j, H, chain)
+    return tot_en
+
+def average_E(chain, T, H, Niter=100):
+    tot_en = calc_tot_en(chain, H)
+    avg_en = 0.0
+    n = len(chain)
+    m = len(chain[0])
+    for i in range(Niter):
+        try_i = random.randint(0, n-1)
+        try_j = random.randint(0, m-1)
+        delta_E = try_energy(try_i, try_j, H, chain)
+        if delta_E < 0:
+            tot_en += delta_E
+            chain[try_i][try_j] = -chain[try_i][try_j] 
+        else:
+            if random.uniform(0,1) < math.exp(-(delta_E)/T): 
+                tot_en += delta_E                          
+                chain[try_i][try_j] = -chain[try_i][try_j] 
+        avg_en += tot_en/Niter                              
+    return avg_en
+     
+def metropolis(chain, T, H, etol=0.0001, steps_per_cycle=100):
+    avg_en = 0.0
+    avg_en_prev = -100*etol
+    Ncycles  = 0
+    energies = []
+    xi = []
+    while math.fabs(avg_en - avg_en_prev) > etol: 
+        avg_en_prev = avg_en
+        avg_en = average_E(chain, T, H, steps_per_cycle)
+        xi.append(M(chain)/H)
+        energies.append(avg_en)
+        avg_en = (avg_en_prev * Ncycles + avg_en) / (Ncycles + 1)
+        Ncycles += 1                                           
+    return energies, xi
+
+xi = []
+temps = []
+
+T = 0.05
+T_end = 4
+gap = 0.05
+n = 10
+m = 10
+N = n * m
+H = 1
+
+while T <= T_end:
+    start_time = datetime.now()
+    
+    chain = make_chain(n, m)
+    energies, xi_tmp = metropolis(chain, T, H, etol=1e-6)
+    
+    average_xi = sum(xi_tmp)/len(xi_tmp)
+    xi.append(average_xi)
+    temps.append(T)
+    
+    print("done: T =", T)
+    print('Время выполнения: {}'.format(datetime.now() - start_time))
+    T += gap
+    T = round(T, 2)
