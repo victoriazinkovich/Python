@@ -1,4 +1,4 @@
-Modeling of the Ising lattice
+### Modeling of the Ising lattice
 
 1. The code works for a chain of spins in the two-dimensional case
 2. The dependence of the average energy on temperature in the range from 0 to 4 J/k
